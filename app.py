@@ -113,6 +113,20 @@ div[data-testid="stSidebar"]{
     background: linear-gradient(180deg, #07111f 0%, #0a1524 100%);
     border-right: 1px solid rgba(125,152,190,0.12);
 }
+div[data-testid="stSidebar"] *{
+    color: #eef4ff !important;
+}
+div[data-testid="stSidebar"] label,
+div[data-testid="stSidebar"] p,
+div[data-testid="stSidebar"] span,
+div[data-testid="stSidebar"] div{
+    color: #eef4ff !important;
+}
+div[data-testid="stSidebar"] [data-baseweb="select"] > div,
+div[data-testid="stSidebar"] [data-baseweb="tag"]{
+    background: rgba(255,255,255,0.08) !important;
+    color: #ffffff !important;
+}
 .stDataFrame, .stTable{
     border-radius: 18px;
     overflow: hidden;
@@ -391,32 +405,49 @@ with center2:
         </div>
         """, unsafe_allow_html=True)
 
-    risk_df = pd.DataFrame({
-        ("المؤشر" if language=="العربية" else "Indicator"): [
-            "Operational Pressure", "Deviation Exposure", "Penalty Sensitivity", "Market / Fuel Risk"
-        ],
-        ("Level" if language=="العربية" else "Level"): [
-            "Medium" if op_impact <= 3 else "High",
-            "Medium" if discount <= 4 else "High",
-            "Medium" if discount <= 5 else "High",
-            "High"
+    risk_labels = ["OPS", "DEV", "PEN", "EXT"]
+    risk_values = [
+        2 if op_impact <= 3 else 3,
+        2 if discount <= 4 else 3,
+        2 if discount <= 5 else 3,
+        3
+    ]
+    risk_names = [
+        "Operational Pressure" if language=="English" else "الضغط التشغيلي",
+        "Deviation Exposure" if language=="English" else "مخاطر الانحرافات",
+        "Penalty Sensitivity" if language=="English" else "حساسية الغرامات",
+        "External Risk" if language=="English" else "المخاطر الخارجية",
+    ]
+    risk_colors = ["#32d583" if v == 1 else "#ffb54a" if v == 2 else "#ff6b6b" for v in risk_values]
+    fig_risk = go.Figure(
+        data=[
+            go.Bar(
+                x=risk_names,
+                y=risk_values,
+                text=risk_labels,
+                textposition="inside",
+                marker=dict(color=risk_colors, line=dict(color="rgba(255,255,255,0.18)", width=1)),
+                hovertemplate="%{x}<extra></extra>",
+            )
         ]
-    })
-    fig_risk = px.imshow(
-        [[1, 2, 3, 3]],
-        text_auto=[["OPS", "DEV", "PEN", "EXT"]],
-        color_continuous_scale=["#32d583","#ffb54a","#ff6b6b"],
-        aspect="auto"
     )
     fig_risk.update_layout(
-        height=155,
-        coloraxis_showscale=False,
-        margin=dict(l=10,r=10,t=5,b=5),
+        height=190,
+        margin=dict(l=10,r=10,t=5,b=10),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color="#eaf2ff"),
-        xaxis=dict(showticklabels=False),
-        yaxis=dict(showticklabels=False),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor="rgba(255,255,255,0.08)",
+            tickmode="array",
+            tickvals=[1,2,3],
+            ticktext=["Low","Medium","High"] if language=="English" else ["منخفض","متوسط","مرتفع"],
+            range=[0,3.4],
+            title=""
+        ),
+        xaxis=dict(showgrid=False, title=""),
+        showlegend=False,
     )
     st.plotly_chart(fig_risk, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
@@ -492,4 +523,4 @@ with b3:
 
 # Footer
 st.markdown("<br>", unsafe_allow_html=True)
-st.caption("Prepared as an executive decision-support dashboard for commercial and operational review.")
+st.caption("Prepared as an executive decision-support dashboard for commercial and operational review." if language=="English" else "تم إعداد هذه اللوحة كأداة دعم قرار للإدارة التجارية والتشغيلية.")
