@@ -393,7 +393,7 @@ if page == "🏠 Executive Overview":
 # ------------------------- PAGE: SIMULATOR -------------------------
 elif page == "🎯 Discount Simulator":
     st.markdown('<div class="panel"><div class="label" style="font-size:1.02rem;">Discount Simulator</div>', unsafe_allow_html=True)
-    sim_revenue = st.selectbox("Revenue to Simulate", [200, 230, 250], index=2)
+    sim_revenue = st.selectbox("Revenue to Simulate", [200, 230, 250, 270, 300], index=2)
     sim_discounts = [x / 2 for x in range(5, 11)]  # 2.5 to 5.0
     sim_df = pd.DataFrame([calc_row(sim_revenue, current_margin, d, current_profit) for d in sim_discounts])
 
