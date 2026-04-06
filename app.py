@@ -1,7 +1,14 @@
 
+import io
+from datetime import datetime
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.pdfgen import canvas
 
 st.set_page_config(
     page_title="Executive Decision Intelligence Dashboard",
@@ -13,94 +20,36 @@ st.set_page_config(
 # ------------------------- THEME -------------------------
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
-
-html, body, [class*="css"]  {
-    font-family: 'Tajawal', sans-serif;
-}
-
 :root{
-    --bg-1:#030916;
-    --bg-2:#071326;
-    --panel:#0a1a31;
-    --panel-2:#0d223f;
-    --line:rgba(113,149,201,0.18);
-    --text:#edf5ff;
-    --muted:#a7b8d3;
-    --blue:#48a7ff;
-    --cyan:#32e0ff;
-    --green:#35d48a;
-    --orange:#ffb44a;
-    --red:#ff6363;
-    --violet:#8b6dff;
+    --bg1:#030916; --bg2:#071326; --panel:#0a1a31; --panel2:#0d223f; --text:#edf5ff; --muted:#a7b8d3;
+    --blue:#48a7ff; --cyan:#32e0ff; --green:#35d48a; --orange:#ffb44a; --red:#ff6363; --line:rgba(112,156,212,0.14);
 }
-
 .stApp{
     background:
         radial-gradient(circle at 15% 5%, rgba(72,167,255,0.20), transparent 18%),
         radial-gradient(circle at 85% 10%, rgba(50,224,255,0.11), transparent 16%),
         radial-gradient(circle at 70% 85%, rgba(255,180,74,0.12), transparent 20%),
-        linear-gradient(180deg, var(--bg-1) 0%, #061121 44%, #040b17 100%);
+        linear-gradient(180deg, var(--bg1) 0%, #061121 44%, #040b17 100%);
     color: var(--text);
 }
-
-.block-container{
-    max-width: 1550px;
-    padding-top: 1rem;
-    padding-bottom: 1rem;
-}
-
-h1,h2,h3,h4,h5,h6,p,div,span,label{
-    color: var(--text) !important;
-}
-
-.small-note{
-    color: var(--muted)!important;
-    font-size: 0.88rem;
-    line-height: 1.5;
-}
-
-.top-shell{
-    background: linear-gradient(180deg, rgba(10,25,48,0.88), rgba(8,18,34,0.88));
+.block-container{max-width:1550px;padding-top:0.8rem;padding-bottom:1rem;}
+h1,h2,h3,h4,h5,h6,p,div,span,label{color:var(--text)!important;}
+.small{color:var(--muted)!important;font-size:.88rem;line-height:1.6;}
+.brand{
+    background: linear-gradient(180deg, rgba(10,25,48,0.90), rgba(8,18,34,0.90));
     border: 1px solid rgba(122,161,220,0.12);
     border-radius: 26px;
     padding: 18px 22px;
     box-shadow: 0 12px 32px rgba(0,0,0,0.28);
 }
-
-.kpi-card{
+.kpi{
     background: linear-gradient(180deg, rgba(11,25,47,0.97), rgba(8,17,32,0.98));
     border: 1px solid rgba(112,156,212,0.15);
     border-radius: 24px;
-    padding: 18px 18px 16px 18px;
-    min-height: 138px;
+    padding: 18px;
+    min-height: 132px;
     box-shadow: 0 16px 32px rgba(0,0,0,0.22);
 }
-
-.kpi-card-glow-green{ box-shadow: 0 12px 28px rgba(53,212,138,0.08);}
-.kpi-card-glow-blue{ box-shadow: 0 12px 28px rgba(72,167,255,0.08);}
-.kpi-card-glow-orange{ box-shadow: 0 12px 28px rgba(255,180,74,0.08);}
-.kpi-card-glow-red{ box-shadow: 0 12px 28px rgba(255,99,99,0.08);}
-
-.kpi-label{
-    color: #b4c6e3 !important;
-    font-size: 0.88rem;
-    letter-spacing: 0.2px;
-    margin-bottom: 10px;
-}
-
-.kpi-value{
-    font-size: 2.1rem;
-    font-weight: 800;
-    line-height: 1.1;
-}
-
-.kpi-sub{
-    color: #95a8c7 !important;
-    font-size: 0.90rem;
-    margin-top: 8px;
-}
-
 .panel{
     background: linear-gradient(180deg, rgba(11,25,47,0.97), rgba(8,17,32,0.98));
     border: 1px solid rgba(112,156,212,0.14);
@@ -109,91 +58,36 @@ h1,h2,h3,h4,h5,h6,p,div,span,label{
     box-shadow: 0 16px 34px rgba(0,0,0,0.22);
     margin-top: 10px;
 }
-
-.panel-title{
-    font-size: 1.12rem;
-    font-weight: 800;
-    margin-bottom: 10px;
+.label{color:#b4c6e3!important;font-size:.88rem;margin-bottom:8px;}
+.title{font-size:2.15rem;font-weight:800;line-height:1.1;}
+.value{font-size:2rem;font-weight:800;line-height:1.1;}
+.blue{color:var(--blue)!important;} .green{color:var(--green)!important;} .orange{color:var(--orange)!important;}
+.red{color:var(--red)!important;} .cyan{color:var(--cyan)!important;}
+.pill{
+    display:inline-block;padding:6px 12px;border-radius:999px;margin:4px 6px 0 0;
+    font-size:.82rem;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.05);
 }
-
-.status-card{
-    border-radius: 22px;
-    padding: 16px;
-    min-height: 145px;
-    border: 1px solid rgba(255,255,255,0.08);
+.menu-item{
+    padding:10px 14px;border-radius:14px;margin:6px 0;background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.06);font-weight:600;
 }
-.status-green{
-    background: linear-gradient(180deg, rgba(8,56,41,0.95), rgba(6,34,26,0.96));
+.state{
+    border-radius:20px;padding:16px;min-height:140px;border:1px solid rgba(255,255,255,0.08);
 }
-.status-orange{
-    background: linear-gradient(180deg, rgba(72,46,4,0.95), rgba(45,27,4,0.96));
-}
-.status-red{
-    background: linear-gradient(180deg, rgba(68,17,18,0.95), rgba(40,9,10,0.96));
-}
-.status-title{
-    font-size: 1.05rem;
-    font-weight: 800;
-    margin-bottom: 10px;
-}
-.status-text{
-    color:#dce7f7 !important;
-    font-size: 0.96rem;
-    line-height: 1.6;
-}
-
-.summary-card{
-    background: linear-gradient(180deg, rgba(12,25,45,0.98), rgba(9,18,34,0.98));
-    border: 1px solid rgba(110,150,208,0.16);
-    border-radius: 26px;
-    padding: 22px;
-    min-height: 340px;
-    box-shadow: 0 16px 36px rgba(0,0,0,0.25);
-}
-
-.metric-pill{
-    display:inline-block;
-    padding:6px 12px;
-    border-radius:999px;
-    margin: 4px 6px 0 0;
-    font-size:0.82rem;
-    border:1px solid rgba(255,255,255,0.08);
-    background: rgba(255,255,255,0.05);
-}
-
-.green{color:var(--green)!important;}
-.orange{color:var(--orange)!important;}
-.red{color:var(--red)!important;}
-.blue{color:var(--blue)!important;}
-.cyan{color:var(--cyan)!important;}
-
+.accept{background: linear-gradient(180deg, rgba(8,56,41,0.95), rgba(6,34,26,0.96));}
+.risk{background: linear-gradient(180deg, rgba(72,46,4,0.95), rgba(45,27,4,0.96));}
+.reject{background: linear-gradient(180deg, rgba(68,17,18,0.95), rgba(40,9,10,0.96));}
 div[data-testid="stSidebar"]{
     background: linear-gradient(180deg, #07111f 0%, #091524 100%);
     border-right: 1px solid rgba(118,154,210,0.12);
 }
-div[data-testid="stSidebar"] *{
-    color:#eff5ff !important;
-}
+div[data-testid="stSidebar"] *{color:#eff5ff !important;}
 div[data-testid="stSidebar"] [data-baseweb="select"] > div,
 div[data-testid="stSidebar"] [data-baseweb="tag"]{
     background: rgba(255,255,255,0.08) !important;
     color:#ffffff !important;
 }
-div[data-testid="stSidebar"] .stSlider [data-baseweb="slider"] div{
-    color:#eff5ff !important;
-}
-.stDataFrame{
-    border-radius: 20px;
-    overflow: hidden;
-}
-
-div[data-testid="stMetric"]{
-    background: transparent;
-}
-
-hr{
-    border-color: rgba(255,255,255,0.08);
-}
+.stDataFrame{border-radius:20px;overflow:hidden;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -201,29 +95,37 @@ hr{
 def money(v):
     return f"{v:,.1f}M"
 
-def calc_scenario(revenue, current_margin, discount, op_impact):
-    expected_margin = current_margin - discount
-    real_margin = expected_margin - op_impact
-    net_profit = revenue * real_margin / 100
-    return round(expected_margin, 2), round(real_margin, 2), round(net_profit, 2)
-
 def break_even_margin(current_profit, revenue):
-    return round((current_profit / revenue) * 100, 2)
+    return (current_profit / revenue) * 100
 
-def zone_for(real_margin, be_margin):
+def zone_from_margin(real_margin, be_margin):
     if real_margin >= be_margin + 1:
         return "Accept"
     elif real_margin >= be_margin:
         return "Risk"
     return "Reject"
 
-def zone_label(zone, lang):
-    if lang == "العربية":
-        return {"Accept":"موافقة مشروطة", "Risk":"مراجعة مشروطة", "Reject":"غير موصى به"}[zone]
-    return {"Accept":"Conditional Approval", "Risk":"Conditional Review", "Reject":"Not Recommended"}[zone]
+def zone_ar(z):
+    return {"Accept":"موافقة مشروطة", "Risk":"مراجعة مشروطة", "Reject":"غير موصى به"}[z]
 
-def zone_color(zone):
-    return {"Accept":"#35d48a", "Risk":"#ffb44a", "Reject":"#ff6363"}[zone]
+def zone_color(z):
+    return {"Accept":"#35d48a", "Risk":"#ffb44a", "Reject":"#ff6363"}[z]
+
+def calc_row(revenue, current_margin, discount, op_impact, current_profit):
+    expected_margin = current_margin - discount
+    real_margin = expected_margin - op_impact
+    net_profit = revenue * real_margin / 100.0
+    be = break_even_margin(current_profit, revenue)
+    decision = zone_from_margin(real_margin, be)
+    return {
+        "Revenue": revenue,
+        "Expected Margin %": round(expected_margin,2),
+        "Real Margin %": round(real_margin,2),
+        "Break-even Margin %": round(be,2),
+        "Net Profit": round(net_profit,2),
+        "Delta Profit": round(net_profit - current_profit,2),
+        "Decision Zone": decision
+    }
 
 def gauge(value, title, min_v, max_v, color, suffix="", threshold=None):
     fig = go.Figure(go.Indicator(
@@ -237,9 +139,9 @@ def gauge(value, title, min_v, max_v, color, suffix="", threshold=None):
             'bgcolor': 'rgba(255,255,255,0.04)',
             'borderwidth': 0,
             'steps': [
-                {'range': [min_v, (min_v+max_v)*0.45], 'color': 'rgba(255,99,99,0.16)'},
-                {'range': [(min_v+max_v)*0.45, (min_v+max_v)*0.7], 'color': 'rgba(255,180,74,0.16)'},
-                {'range': [(min_v+max_v)*0.7, max_v], 'color': 'rgba(53,212,138,0.16)'}
+                {'range': [min_v, max_v*0.45], 'color': 'rgba(255,99,99,0.16)'},
+                {'range': [max_v*0.45, max_v*0.7], 'color': 'rgba(255,180,74,0.16)'},
+                {'range': [max_v*0.7, max_v], 'color': 'rgba(53,212,138,0.16)'}
             ],
             'threshold': {
                 'line': {'color': '#ffffff', 'width': 4},
@@ -248,81 +150,96 @@ def gauge(value, title, min_v, max_v, color, suffix="", threshold=None):
             }
         }
     ))
-    fig.update_layout(
-        height=255,
-        margin=dict(l=12, r=12, t=55, b=8),
-        paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#edf5ff")
-    )
+    fig.update_layout(height=255, margin=dict(l=12, r=12, t=55, b=8), paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#edf5ff"))
     return fig
 
+def build_pdf(summary):
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+
+    # Background
+    c.setFillColorRGB(0.03, 0.07, 0.14)
+    c.rect(0, 0, width, height, fill=1, stroke=0)
+
+    # Header block
+    c.setFillColorRGB(0.05, 0.12, 0.24)
+    c.roundRect(15*mm, height-55*mm, width-30*mm, 35*mm, 8*mm, fill=1, stroke=0)
+
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 18)
+    c.drawString(22*mm, height-32*mm, "Executive Decision Dashboard")
+    c.setFont("Helvetica", 11)
+    c.setFillColorRGB(0.75, 0.82, 0.92)
+    c.drawString(22*mm, height-39*mm, "Discount vs Volume Increase - Executive Summary")
+
+    y = height - 72*mm
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 13)
+    c.drawString(20*mm, y, "Key Metrics")
+    y -= 8*mm
+
+    c.setFont("Helvetica", 11)
+    lines = [
+        f"Current Revenue: {summary['current_revenue']}",
+        f"Current Net Margin: {summary['current_margin']}",
+        f"Current Net Profit: {summary['current_profit']}",
+        f"Selected Discount: {summary['discount']}",
+        f"Operational Impact: {summary['op_impact']}",
+        f"Best Scenario Revenue: {summary['best_revenue']}",
+        f"Best Real Margin: {summary['best_real_margin']}",
+        f"Best Net Profit: {summary['best_net_profit']}",
+        f"Recommendation: {summary['recommendation']}",
+    ]
+    for line in lines:
+        c.drawString(22*mm, y, line)
+        y -= 7*mm
+
+    y -= 4*mm
+    c.setFont("Helvetica-Bold", 13)
+    c.drawString(20*mm, y, "Management Notes")
+    y -= 8*mm
+    c.setFont("Helvetica", 11)
+    notes = [
+        "1. Conditional approval is preferred only when real margin remains above break-even with safety buffer.",
+        "2. Main strengths: secured pipeline, early procurement planning, resource readiness, cash-flow clarity.",
+        "3. Main risks: discount erosion, operating pressure, penalties, and material/fuel escalation.",
+        "4. Full rejection may reduce next year's market share if work is redistributed to other contractors."
+    ]
+    for note in notes:
+        c.drawString(22*mm, y, note[:110])
+        y -= 7*mm
+
+    c.setFillColorRGB(0.65, 0.75, 0.88)
+    c.setFont("Helvetica", 9)
+    c.drawString(20*mm, 12*mm, f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    c.save()
+    buffer.seek(0)
+    return buffer
+
 # ------------------------- SIDEBAR -------------------------
-st.sidebar.markdown("## ⚙️ إعدادات اللوحة")
-language = st.sidebar.radio("اللغة / Language", ["العربية", "English"], index=0)
-
-ar = language == "العربية"
-
-text = {
-    "title": "لوحة القرار التنفيذي الذكية" if ar else "Executive Decision Intelligence Dashboard",
-    "sub": "تحليل الخصم مقابل زيادة حجم الأعمال" if ar else "Discount vs Volume Increase Analysis",
-    "menu": "العرض التنفيذي" if ar else "Executive View",
-    "cur_rev": "الإيراد الحالي" if ar else "Current Revenue",
-    "cur_margin": "هامش الربح الحالي %" if ar else "Current Net Margin %",
-    "discount": "الخصم المقترح %" if ar else "Proposed Discount %",
-    "impact": "الأثر التشغيلي المتوقع %" if ar else "Expected Operational Impact %",
-    "revenues": "الإيرادات المقترحة" if ar else "Proposed Revenues",
-    "summary": "الملخص التنفيذي" if ar else "Executive Summary",
-    "scenario": "تحليل السيناريوهات" if ar else "Scenario Analysis",
-    "margin": "تحليل الهامش" if ar else "Margin Analysis",
-    "zones": "مناطق القرار" if ar else "Decision Zones",
-    "risks": "مؤشرات المخاطر" if ar else "Risk Indicators",
-    "recommendation": "التوصية النهائية" if ar else "Final Recommendation",
-    "strengths": "نقاط القوة" if ar else "Strengths",
-    "weaknesses": "نقاط الضعف والمخاطر" if ar else "Weaknesses & Risks",
-    "table": "جدول المقارنة" if ar else "Comparison Table",
-}
-
-current_revenue = st.sidebar.slider(text["cur_rev"], 50, 500, 150, 10)
-current_margin = st.sidebar.slider(text["cur_margin"], 5.0, 35.0, 20.0, 0.5)
-discount = st.sidebar.slider(text["discount"], 0.0, 12.0, 5.0, 0.5)
-op_impact = st.sidebar.slider(text["impact"], 0.0, 8.0, 3.0, 0.5)
-proposed_revenues = st.sidebar.multiselect(text["revenues"], [180, 200, 220, 230, 250, 275, 300], default=[200, 230, 250])
-show_notes = st.sidebar.checkbox("إظهار ملاحظات الإدارة" if ar else "Show management notes", value=True)
-
-st.sidebar.markdown("---")
-st.sidebar.markdown(
-    """
-    <div class="small-note">
-    • اختر الإيرادات المقترحة والخصم والأثر التشغيلي. <br>
-    • اللوحة تقارن الربحية الحالية مع الربحية الفعلية بعد الخصم والتشغيل.
-    </div>
-    """ if ar else """
-    <div class="small-note">
-    • Select proposed revenues, discount, and operating impact. <br>
-    • Dashboard compares current profitability with real post-offer profitability.
-    </div>
-    """,
-    unsafe_allow_html=True
+st.sidebar.image("logo.png", use_container_width=True)
+st.sidebar.markdown("### التنقل")
+menu = st.sidebar.radio(
+    "",
+    ["🏠 Executive Overview", "🎯 Discount Simulator", "⚠️ Risk Center"],
+    index=0
 )
 
-# ------------------------- DATA -------------------------
-current_profit = round(current_revenue * current_margin / 100, 2)
+st.sidebar.markdown("### المدخلات الأساسية")
+current_revenue = st.sidebar.slider("الإيراد الحالي", 50, 500, 150, 10)
+current_margin = st.sidebar.slider("هامش الربح الحالي %", 5.0, 35.0, 20.0, 0.5)
+discount = st.sidebar.slider("الخصم الحالي %", 0.0, 12.0, 5.0, 0.5)
+op_impact = st.sidebar.slider("الأثر التشغيلي المتوقع %", 0.0, 8.0, 3.0, 0.5)
+proposed_revenues = st.sidebar.multiselect("الإيرادات المقترحة", [180,200,220,230,250,275,300], default=[200,230,250])
 
-rows = []
-for rev in proposed_revenues:
-    expected_margin, real_margin, net_profit = calc_scenario(rev, current_margin, discount, op_impact)
-    be_margin = break_even_margin(current_profit, rev)
-    zone = zone_for(real_margin, be_margin)
-    rows.append({
-        "Revenue": rev,
-        "Expected Margin %": expected_margin,
-        "Real Margin %": real_margin,
-        "Break-even Margin %": be_margin,
-        "Net Profit": net_profit,
-        "Delta Profit": round(net_profit - current_profit, 2),
-        "Decision Zone": zone
-    })
+st.sidebar.markdown("### الهوية والعلامة")
+company_name = st.sidebar.text_input("اسم الشركة", value="MST Executive")
+brand_line = st.sidebar.text_input("وصف مختصر", value="Commercial Decision Dashboard")
+show_brand_notes = st.sidebar.checkbox("إظهار الملاحظات الإدارية", value=True)
 
+current_profit = round(current_revenue * current_margin / 100.0, 2)
+rows = [calc_row(r, current_margin, discount, op_impact, current_profit) for r in proposed_revenues]
 df = pd.DataFrame(rows)
 if not df.empty:
     df = df.sort_values(["Net Profit", "Real Margin %"], ascending=[False, False]).reset_index(drop=True)
@@ -330,143 +247,102 @@ if not df.empty:
 else:
     best = None
 
+safe_margin = round((best["Break-even Margin %"] + 1), 2) if best is not None else 0
+
+# PDF export
+summary = {
+    "current_revenue": money(current_revenue),
+    "current_margin": f"{current_margin:.1f}%",
+    "current_profit": money(current_profit),
+    "discount": f"{discount:.1f}%",
+    "op_impact": f"{op_impact:.1f}%",
+    "best_revenue": money(best["Revenue"]) if best is not None else "-",
+    "best_real_margin": f"{best['Real Margin %']:.1f}%" if best is not None else "-",
+    "best_net_profit": money(best["Net Profit"]) if best is not None else "-",
+    "recommendation": zone_ar(best["Decision Zone"]) if best is not None else "-",
+}
+pdf_buffer = build_pdf(summary)
+
 # ------------------------- HEADER -------------------------
-left_h, right_h = st.columns([4.8, 1.3])
-with left_h:
+top1, top2 = st.columns([4.7, 1.5])
+with top1:
     st.markdown(f"""
-    <div class="top-shell">
-        <div style="font-size:2.15rem;font-weight:800;line-height:1.1;">{text["title"]}</div>
-        <div class="small-note" style="margin-top:8px;">{text["sub"]}</div>
-        <div style="margin-top:12px;">
-            <span class="metric-pill">Revenue Baseline: {money(current_revenue)}</span>
-            <span class="metric-pill">Net Margin: {current_margin:.1f}%</span>
-            <span class="metric-pill">Discount: {discount:.1f}%</span>
-            <span class="metric-pill">Operational Impact: {op_impact:.1f}%</span>
+    <div class="brand">
+        <div class="title">{company_name}</div>
+        <div class="small">{brand_line}</div>
+        <div style="margin-top:10px;">
+            <span class="pill">Baseline Revenue: {money(current_revenue)}</span>
+            <span class="pill">Net Margin: {current_margin:.1f}%</span>
+            <span class="pill">Discount: {discount:.1f}%</span>
+            <span class="pill">Operational Impact: {op_impact:.1f}%</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
-with right_h:
-    status = zone_label(best["Decision Zone"], language) if best is not None else "-"
-    status_cls = "green" if best is not None and best["Decision Zone"]=="Accept" else "orange" if best is not None and best["Decision Zone"]=="Risk" else "red"
-    st.markdown(f"""
-    <div class="summary-card">
-        <div class="small-note">{text["recommendation"]}</div>
-        <div class="kpi-value {status_cls}" style="margin-top:8px;">{status}</div>
-        <div class="kpi-sub">{'أفضل مخرجات النموذج الحالي' if ar else 'Best current modeled output'}</div>
-        <hr>
-        <div class="small-note">{'أفضل إيراد' if ar else 'Best Revenue'}</div>
-        <div style="font-size:1.45rem;font-weight:800;">{money(best['Revenue']) if best is not None else '-'}</div>
-        <div class="small-note" style="margin-top:8px;">{'الهامش الفعلي' if ar else 'Real Margin'}</div>
-        <div style="font-size:1.2rem;font-weight:700;" class="cyan">{best['Real Margin %']:.1f}%</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# ------------------------- KPI CARDS -------------------------
-k1, k2, k3, k4 = st.columns(4)
-with k1:
-    st.markdown(f"""
-    <div class="kpi-card kpi-card-glow-blue">
-        <div class="kpi-label">{'الإيراد الحالي' if ar else 'Current Revenue'}</div>
-        <div class="kpi-value blue">{money(current_revenue)}</div>
-        <div class="kpi-sub">{'خط الأساس للمقارنة' if ar else 'Baseline reference point'}</div>
-    </div>
-    """, unsafe_allow_html=True)
-with k2:
-    st.markdown(f"""
-    <div class="kpi-card kpi-card-glow-green">
-        <div class="kpi-label">{'صافي الربح الحالي' if ar else 'Current Net Profit'}</div>
-        <div class="kpi-value green">{money(current_profit)}</div>
-        <div class="kpi-sub">{'الربح قبل العرض الجديد' if ar else 'Profit before the new offer'}</div>
-    </div>
-    """, unsafe_allow_html=True)
-with k3:
-    best_profit = best["Net Profit"] if best is not None else 0
-    delta = best["Delta Profit"] if best is not None else 0
-    delta_cls = "green" if delta >= 0 else "red"
-    st.markdown(f"""
-    <div class="kpi-card kpi-card-glow-orange">
-        <div class="kpi-label">{'أفضل صافي ربح متوقع' if ar else 'Best Expected Net Profit'}</div>
-        <div class="kpi-value orange">{money(best_profit)}</div>
-        <div class="kpi-sub">{'فرق الربح عن الوضع الحالي' if ar else 'Profit delta vs current'}: <span class="{delta_cls}">{delta:+.1f}M</span></div>
-    </div>
-    """, unsafe_allow_html=True)
-with k4:
-    safe_margin = best["Break-even Margin %"] + 1 if best is not None else 0
-    st.markdown(f"""
-    <div class="kpi-card kpi-card-glow-red">
-        <div class="kpi-label">{'الهامش الآمن المطلوب' if ar else 'Safe Margin Needed'}</div>
-        <div class="kpi-value">{safe_margin:.1f}%</div>
-        <div class="kpi-sub">{'نقطة الربح المقبول بعد هامش أمان' if ar else 'Break-even plus safety buffer'}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# ------------------------- MAIN VISUALS -------------------------
-l1, l2, l3 = st.columns([1.35, 1.0, 1.0])
-
-with l1:
-    st.markdown(f'<div class="panel"><div class="panel-title">{text["scenario"]}</div>', unsafe_allow_html=True)
-    fig_profit = go.Figure()
-    fig_profit.add_bar(
-        x=[f"{int(v)}M" for v in df["Revenue"]],
-        y=df["Net Profit"],
-        text=[f"{v:.1f}M" for v in df["Net Profit"]],
-        textposition="outside",
-        marker=dict(
-            color=[zone_color(z) for z in df["Decision Zone"]],
-            line=dict(color="rgba(255,255,255,0.18)", width=1.0)
-        ),
-        hovertemplate="%{x}<br>Profit: %{y:.1f}M<extra></extra>"
+with top2:
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.download_button(
+        "📄 Download PDF Summary",
+        data=pdf_buffer,
+        file_name="executive_decision_summary.pdf",
+        mime="application/pdf",
+        use_container_width=True
     )
-    fig_profit.add_hline(
-        y=current_profit,
-        line_color="#48a7ff",
-        line_dash="dash",
-        annotation_text=("الربح الحالي" if ar else "Current Profit"),
-        annotation_position="top left"
-    )
-    fig_profit.update_layout(
-        height=350,
-        margin=dict(l=10,r=10,t=10,b=8),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#edf5ff"),
-        xaxis=dict(showgrid=False),
-        yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.08)", title="M SAR"),
-        showlegend=False
-    )
-    st.plotly_chart(fig_profit, use_container_width=True)
+    st.markdown(f"""
+    <div class="small" style="margin-top:12px;">
+    أفضل مخرجات النموذج الحالي:<br>
+    <b>{money(best["Revenue"]) if best is not None else "-"}</b><br>
+    الهامش الفعلي: <b>{best["Real Margin %"]:.1f}%</b><br>
+    القرار: <b>{zone_ar(best["Decision Zone"]) if best is not None else "-"}</b>
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-with l2:
-    title = "الهامش الفعلي" if ar else "Real Margin"
-    fig_g1 = gauge(best["Real Margin %"] if best is not None else 0, title, 0, 25, "#32e0ff", "%", threshold=safe_margin)
-    st.markdown(f'<div class="panel"><div class="panel-title">{text["margin"]}</div>', unsafe_allow_html=True)
-    st.plotly_chart(fig_g1, use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+# ------------------------- PAGE 1 -------------------------
+if menu == "🏠 Executive Overview":
+    k1,k2,k3,k4 = st.columns(4)
+    with k1:
+        st.markdown(f"""<div class="kpi"><div class="label">الإيراد الحالي</div><div class="value blue">{money(current_revenue)}</div><div class="small">خط الأساس للمقارنة</div></div>""", unsafe_allow_html=True)
+    with k2:
+        st.markdown(f"""<div class="kpi"><div class="label">صافي الربح الحالي</div><div class="value green">{money(current_profit)}</div><div class="small">الربح قبل العرض الجديد</div></div>""", unsafe_allow_html=True)
+    with k3:
+        delta = best["Delta Profit"] if best is not None else 0
+        delta_cls = "green" if delta >= 0 else "red"
+        st.markdown(f"""<div class="kpi"><div class="label">أفضل صافي ربح متوقع</div><div class="value orange">{money(best["Net Profit"]) if best is not None else "-"}</div><div class="small">فرق الربح: <span class="{delta_cls}">{delta:+.1f}M</span></div></div>""", unsafe_allow_html=True)
+    with k4:
+        st.markdown(f"""<div class="kpi"><div class="label">الهامش الآمن المطلوب</div><div class="value">{safe_margin:.1f}%</div><div class="small">هامش التعادل + أمان</div></div>""", unsafe_allow_html=True)
 
-with l3:
-    title = "قوة القرار" if ar else "Decision Strength"
-    strength_score = 0
-    if best is not None:
-        if best["Decision Zone"] == "Accept":
-            strength_score = 82
-        elif best["Decision Zone"] == "Risk":
-            strength_score = 58
-        else:
-            strength_score = 28
-    fig_g2 = gauge(strength_score, title, 0, 100, zone_color(best["Decision Zone"]) if best is not None else "#ff6363", "%", threshold=75)
-    st.markdown(f'<div class="panel"><div class="panel-title">{text["zones"]}</div>', unsafe_allow_html=True)
-    st.plotly_chart(fig_g2, use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    c1,c2,c3 = st.columns([1.35,1,1])
+    with c1:
+        st.markdown('<div class="panel"><div class="label" style="font-size:1.05rem;">تحليل السيناريوهات</div>', unsafe_allow_html=True)
+        fig = go.Figure()
+        fig.add_bar(
+            x=[f"{int(v)}M" for v in df["Revenue"]],
+            y=df["Net Profit"],
+            text=[f"{v:.1f}M" for v in df["Net Profit"]],
+            textposition="outside",
+            marker=dict(color=[zone_color(z) for z in df["Decision Zone"]], line=dict(color="rgba(255,255,255,0.18)", width=1)),
+            hovertemplate="%{x}<br>Profit %{y:.1f}M<extra></extra>"
+        )
+        fig.add_hline(y=current_profit, line_dash="dash", line_color="#48a7ff", annotation_text="Current Profit", annotation_position="top left")
+        fig.update_layout(height=350, margin=dict(l=10,r=10,t=10,b=8), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#edf5ff"), xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.08)", title="M SAR"), showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-# ------------------------- SECOND ROW -------------------------
-m1, m2, m3 = st.columns([1.35, 1.0, 1.0])
+    with c2:
+        st.markdown('<div class="panel"><div class="label" style="font-size:1.05rem;">تحليل الهامش</div>', unsafe_allow_html=True)
+        st.plotly_chart(gauge(best["Real Margin %"] if best is not None else 0, "الهامش الفعلي", 0, 25, "#32e0ff", "%", threshold=safe_margin), use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-with m1:
-    st.markdown(f'<div class="panel"><div class="panel-title">{text["table"]}</div>', unsafe_allow_html=True)
-    show_df = df.copy()
-    if ar:
-        show_df = show_df.rename(columns={
+    with c3:
+        score = 82 if best is not None and best["Decision Zone"]=="Accept" else 58 if best is not None and best["Decision Zone"]=="Risk" else 28
+        st.markdown('<div class="panel"><div class="label" style="font-size:1.05rem;">قوة القرار</div>', unsafe_allow_html=True)
+        st.plotly_chart(gauge(score, "Decision Strength", 0, 100, zone_color(best["Decision Zone"]) if best is not None else "#ff6363", "%", threshold=75), use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    m1,m2,m3 = st.columns([1.35,1,1])
+    with m1:
+        st.markdown('<div class="panel"><div class="label" style="font-size:1.05rem;">جدول المقارنة</div>', unsafe_allow_html=True)
+        show_df = df.rename(columns={
             "Revenue":"الإيراد",
             "Expected Margin %":"الهامش المتوقع %",
             "Real Margin %":"الهامش الفعلي %",
@@ -476,113 +352,156 @@ with m1:
             "Decision Zone":"منطقة القرار",
         })
         show_df["منطقة القرار"] = show_df["منطقة القرار"].replace({"Accept":"موافقة","Risk":"مخاطرة","Reject":"رفض"})
-    st.dataframe(show_df, use_container_width=True, hide_index=True)
+        st.dataframe(show_df, use_container_width=True, hide_index=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with m2:
+        st.markdown("""
+        <div class="panel"><div class="label" style="font-size:1.05rem;">مناطق القرار</div>
+            <div class="state accept"><b>🟢 موافقة</b><br><span class="small">ربحية أعلى من الوضع الحالي مع هامش آمن</span></div><br>
+            <div class="state risk"><b>🟡 مخاطرة</b><br><span class="small">ربح مقبول لكن الهامش قريب من نقطة التعادل</span></div><br>
+            <div class="state reject"><b>🔴 رفض</b><br><span class="small">الربحية لا تبرر مستوى المخاطر</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with m3:
+        final_cls = "green" if best is not None and best["Decision Zone"]=="Accept" else "orange" if best is not None and best["Decision Zone"]=="Risk" else "red"
+        st.markdown(f"""
+        <div class="panel">
+            <div class="label" style="font-size:1.05rem;">الملخص التنفيذي</div>
+            <div class="small">القرار الأفضل حاليًا هو:</div>
+            <div class="value {final_cls}" style="margin-top:8px;">{zone_ar(best["Decision Zone"]) if best is not None else "-"}</div>
+            <div class="small" style="margin-top:10px;">
+            يوصى بالموافقة المشروطة فقط إذا بقي الهامش الفعلي أعلى من هامش التعادل مع إضافة هامش أمان، مع متابعة شهرية للغرامات والانحرافات.
+            </div>
+            {'<hr><div class="small"><b>ملاحظة:</b> في حال الرفض الكامل قد يتم توزيع الأعمال على مقاولين آخرين مما يؤثر على حصة العام القادم.</div>' if show_brand_notes else ''}
+        </div>
+        """, unsafe_allow_html=True)
+
+# ------------------------- PAGE 2 -------------------------
+elif menu == "🎯 Discount Simulator":
+    st.markdown('<div class="panel"><div class="label" style="font-size:1.05rem;">Discount Simulator</div></div>', unsafe_allow_html=True)
+    d_min, d_max = st.slider("نطاق الخصم للمحاكاة %", 0.0, 12.0, (0.0, 10.0), 0.5)
+    selected_revenue = st.selectbox("الإيراد المراد محاكاته", [180,200,220,230,250,275,300], index=4)
+    step = st.selectbox("درجة الحركة", [0.5, 1.0], index=0)
+    active_discount = st.slider("الخصم المراد تحليله %", d_min, d_max, min(discount, d_max), step)
+
+    discount_values = []
+    x = d_min
+    while x <= d_max + 1e-9:
+        discount_values.append(round(x,2))
+        x += step
+    sim_df = pd.DataFrame([calc_row(selected_revenue, current_margin, d, op_impact, current_profit) | {"Discount %": d} for d in discount_values])
+    current_row = sim_df[sim_df["Discount %"] == round(active_discount,2)]
+    current_row = current_row.iloc[0] if not current_row.empty else sim_df.iloc[0]
+    safe_df = sim_df[sim_df["Decision Zone"]=="Accept"]
+    best_safe_discount = safe_df["Discount %"].max() if not safe_df.empty else None
+
+    s1,s2,s3,s4 = st.columns(4)
+    with s1:
+        st.markdown(f"""<div class="kpi"><div class="label">الخصم الحالي المختار</div><div class="value orange">{current_row['Discount %']:.1f}%</div><div class="small">الخصم الذي يتم تحليله الآن</div></div>""", unsafe_allow_html=True)
+    with s2:
+        st.markdown(f"""<div class="kpi"><div class="label">الهامش الفعلي</div><div class="value cyan">{current_row['Real Margin %']:.1f}%</div><div class="small">بعد الخصم والأثر التشغيلي</div></div>""", unsafe_allow_html=True)
+    with s3:
+        cls = "green" if current_row["Delta Profit"] >= 0 else "red"
+        st.markdown(f"""<div class="kpi"><div class="label">صافي الربح المتوقع</div><div class="value {cls}">{money(current_row['Net Profit'])}</div><div class="small">فرق الربح: <span class="{cls}">{current_row['Delta Profit']:+.1f}M</span></div></div>""", unsafe_allow_html=True)
+    with s4:
+        st.markdown(f"""<div class="kpi"><div class="label">أفضل خصم مقبول</div><div class="value green">{f"{best_safe_discount:.1f}%" if best_safe_discount is not None else "لا يوجد"}</div><div class="small">أعلى خصم ما زال داخل الموافقة</div></div>""", unsafe_allow_html=True)
+
+    p1,p2 = st.columns([1.4,1])
+    with p1:
+        st.markdown('<div class="panel"><div class="label" style="font-size:1.05rem;">منحنى الخصم مقابل صافي الربح</div>', unsafe_allow_html=True)
+        fig = go.Figure()
+        fig.add_scatter(
+            x=sim_df["Discount %"], y=sim_df["Net Profit"], mode="lines+markers",
+            line=dict(color="#48a7ff", width=4),
+            marker=dict(size=10, color=[zone_color(z) for z in sim_df["Decision Zone"]]),
+            hovertemplate="Discount %{x:.1f}%<br>Profit %{y:.1f}M<extra></extra>"
+        )
+        fig.add_hline(y=current_profit, line_dash="dash", line_color="#35d48a", annotation_text="Current Profit", annotation_position="top left")
+        fig.update_layout(height=380, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#edf5ff"), xaxis=dict(title="Discount %", showgrid=False), yaxis=dict(title="Net Profit (M SAR)", showgrid=True, gridcolor="rgba(255,255,255,0.08)"))
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    with p2:
+        st.markdown('<div class="panel"><div class="label" style="font-size:1.05rem;">منحنى الخصم مقابل الهامش الفعلي</div>', unsafe_allow_html=True)
+        fig2 = go.Figure()
+        fig2.add_scatter(
+            x=sim_df["Discount %"], y=sim_df["Real Margin %"], mode="lines+markers",
+            line=dict(color="#32e0ff", width=4),
+            marker=dict(size=10, color=[zone_color(z) for z in sim_df["Decision Zone"]]),
+            hovertemplate="Discount %{x:.1f}%<br>Real Margin %{y:.1f}%<extra></extra>"
+        )
+        fig2.add_hline(y=current_row["Break-even Margin %"], line_dash="dash", line_color="#ffb44a", annotation_text=f"Break-even {current_row['Break-even Margin %']:.1f}%", annotation_position="top left")
+        fig2.update_layout(height=380, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#edf5ff"), xaxis=dict(title="Discount %", showgrid=False), yaxis=dict(title="Real Margin %", showgrid=True, gridcolor="rgba(255,255,255,0.08)"))
+        st.plotly_chart(fig2, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="panel"><div class="label" style="font-size:1.05rem;">جدول المحاكاة</div>', unsafe_allow_html=True)
+    show_sim = sim_df.rename(columns={
+        "Discount %":"الخصم %","Expected Margin %":"الهامش المتوقع %","Real Margin %":"الهامش الفعلي %","Net Profit":"صافي الربح","Break-even Margin %":"هامش التعادل %","Decision Zone":"منطقة القرار","Delta Profit":"فرق الربح"
+    })
+    show_sim["منطقة القرار"] = show_sim["منطقة القرار"].replace({"Accept":"موافقة","Risk":"مخاطرة","Reject":"رفض"})
+    st.dataframe(show_sim, use_container_width=True, hide_index=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-with m2:
-    st.markdown(f'<div class="panel"><div class="panel-title">{text["zones"]}</div>', unsafe_allow_html=True)
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown(f"""
-        <div class="status-card status-green">
-            <div class="status-title">🟢 {'موافقة' if ar else 'Accept'}</div>
-            <div class="status-text">{'ربحية أعلى من الوضع الحالي مع هامش آمن' if ar else 'Higher profit than baseline with safe margin'}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with c2:
-        st.markdown(f"""
-        <div class="status-card status-orange">
-            <div class="status-title">🟡 {'مخاطرة' if ar else 'Risk'}</div>
-            <div class="status-text">{'ربح مقبول لكن الهامش قريب من نقطة التعادل' if ar else 'Acceptable profit but margin is close to break-even'}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with c3:
-        st.markdown(f"""
-        <div class="status-card status-red">
-            <div class="status-title">🔴 {'رفض' if ar else 'Reject'}</div>
-            <div class="status-text">{'الربحية لا تبرر مستوى المخاطر' if ar else 'Profitability does not justify the risk level'}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+# ------------------------- PAGE 3 -------------------------
+else:
+    st.markdown('<div class="panel"><div class="label" style="font-size:1.05rem;">Risk Center</div></div>', unsafe_allow_html=True)
 
-with m3:
-    st.markdown(f'<div class="panel"><div class="panel-title">{text["risks"]}</div>', unsafe_allow_html=True)
-    risk_names = (
-        ["الضغط التشغيلي", "الانحرافات", "الغرامات", "المواد/الوقود"]
-        if ar else
-        ["Operational", "Deviations", "Penalties", "Materials/Fuel"]
-    )
+    risk_names = ["الضغط التشغيلي", "الانحرافات", "الغرامات", "المواد/الوقود"]
     risk_values = [
         2 if op_impact <= 2 else 3 if op_impact <= 4 else 4,
         2 if discount <= 3 else 3 if discount <= 5 else 4,
         2 if discount <= 4 else 3 if discount <= 6 else 4,
         4
     ]
-    risk_fig = go.Figure()
-    risk_fig.add_bar(
-        x=risk_names,
-        y=risk_values,
-        text=["L" if v==1 else "M" if v==2 else "H" if v==3 else "C" for v in risk_values],
-        textposition="inside",
-        marker=dict(color=["#35d48a" if v<=2 else "#ffb44a" if v==3 else "#ff6363" for v in risk_values]),
-        hovertemplate="%{x}<extra></extra>"
-    )
-    risk_fig.update_layout(
-        height=310,
-        margin=dict(l=10,r=10,t=10,b=10),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#edf5ff"),
-        xaxis=dict(showgrid=False),
-        yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.08)", tickvals=[1,2,3,4],
-                   ticktext=(["Low","Med","High","Critical"] if not ar else ["منخفض","متوسط","مرتفع","حرج"]),
-                   range=[0,4.5]),
-        showlegend=False
-    )
-    st.plotly_chart(risk_fig, use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    risk_colors = ["#35d48a" if v<=2 else "#ffb44a" if v==3 else "#ff6363" for v in risk_values]
 
-# ------------------------- BOTTOM ROW -------------------------
-b1, b2, b3 = st.columns([1,1,1])
+    r1, r2, r3 = st.columns(3)
+    with r1:
+        st.markdown(f"""<div class="kpi"><div class="label">مستوى الضغط التشغيلي</div><div class="value {'green' if risk_values[0]<=2 else 'orange' if risk_values[0]==3 else 'red'}">{['-','منخفض','متوسط','مرتفع','حرج'][risk_values[0]]}</div><div class="small">مرتبط بالأثر التشغيلي المدخل</div></div>""", unsafe_allow_html=True)
+    with r2:
+        st.markdown(f"""<div class="kpi"><div class="label">مخاطر الربحية</div><div class="value {'green' if best is not None and best['Decision Zone']=='Accept' else 'orange' if best is not None and best['Decision Zone']=='Risk' else 'red'}">{zone_ar(best['Decision Zone']) if best is not None else '-'}</div><div class="small">تعتمد على الهامش الفعلي مقابل هامش التعادل</div></div>""", unsafe_allow_html=True)
+    with r3:
+        st.markdown(f"""<div class="kpi"><div class="label">أثر المواد والوقود</div><div class="value red">مرتفع</div><div class="small">خطر خارجي يحتاج بند مراجعة أسعار</div></div>""", unsafe_allow_html=True)
 
-with b1:
-    st.markdown(f"""
+    rc1, rc2 = st.columns([1.1, 1])
+    with rc1:
+        st.markdown('<div class="panel"><div class="label" style="font-size:1.05rem;">مصفوفة المخاطر</div>', unsafe_allow_html=True)
+        risk_fig = go.Figure()
+        risk_fig.add_bar(
+            x=risk_names, y=risk_values,
+            text=["L" if v==1 else "M" if v==2 else "H" if v==3 else "C" for v in risk_values],
+            textposition="inside",
+            marker=dict(color=risk_colors),
+            hovertemplate="%{x}<extra></extra>"
+        )
+        risk_fig.update_layout(height=350, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#edf5ff"), xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.08)", tickvals=[1,2,3,4], ticktext=["منخفض","متوسط","مرتفع","حرج"], range=[0,4.5]), showlegend=False)
+        st.plotly_chart(risk_fig, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with rc2:
+        st.markdown("""
+        <div class="panel">
+            <div class="label" style="font-size:1.05rem;">خطة التعامل مع المخاطر</div>
+            <div class="small">
+            • تحديد سقف خصم واضح وربطه بحجم أعمال مضمون.<br>
+            • إدراج بند مراجعة أسعار للمواد والمحروقات إن أمكن.<br>
+            • متابعة شهرية للانحرافات والغرامات والتكلفة الإضافية.<br>
+            • تجهيز خطة موارد وتوريد من بداية السنة لتقليل الارتباك التشغيلي.<br>
+            • عدم اتخاذ قرار نهائي بناءً على الإيراد فقط؛ بل على الربحية الفعلية.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("""
     <div class="panel">
-        <div class="panel-title">{text["strengths"]}</div>
-        <div class="small-note">
-        {'• ضمان حجم عمل من بداية العام<br>• تحسين التوريد وشراء المواد مبكرًا<br>• ترتيب الموارد واللوجستيات بوقت كافٍ<br>• وضوح أعلى للخطة المالية السنوية' if ar else '• Secured work volume from the start of the year<br>• Better early procurement and material planning<br>• More time to arrange resources and logistics<br>• Stronger annual financial visibility'}
+        <div class="label" style="font-size:1.05rem;">قراءة تنفيذية سريعة</div>
+        <div class="small">
+        في حال قبول العرض مع خصم مرتفع دون حماية تعاقدية، فإن الخطر الأكبر لن يكون فقط انخفاض هامش الربح، بل أيضًا ارتفاع الانحرافات والغرامات وتكاليف التشغيل. 
+        وفي حال الرفض الكامل، قد يتم توزيع جزء من الأعمال على مقاولين آخرين مما يضغط على حصة العام القادم. لذلك فإن الاتجاه الأفضل غالبًا هو الموافقة المشروطة مع حدود خصم وآلية متابعة واضحة.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-with b2:
-    st.markdown(f"""
-    <div class="panel">
-        <div class="panel-title">{text["weaknesses"]}</div>
-        <div class="small-note">
-        {'• الخصم يقلل الربح مباشرة<br>• ضغط أعلى على الجودة والتنفيذ<br>• احتمالية زيادة deviations و penalties<br>• خطر ارتفاع أسعار المواد والمحروقات' if ar else '• Discount directly reduces profit<br>• Higher pressure on execution and quality<br>• Higher probability of deviations and penalties<br>• Risk of fuel and material price escalation'}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with b3:
-    final_zone = best["Decision Zone"] if best is not None else "Reject"
-    final_cls = "green" if final_zone=="Accept" else "orange" if final_zone=="Risk" else "red"
-    st.markdown(f"""
-    <div class="panel">
-        <div class="panel-title">{text["summary"]}</div>
-        <div class="small-note">
-        {'القرار الأفضل حاليًا هو' if ar else 'The best current decision is'}:
-        </div>
-        <div style="font-size:1.4rem;font-weight:800;margin-top:8px;" class="{final_cls}">
-            {zone_label(final_zone, language)}
-        </div>
-        <div class="small-note" style="margin-top:10px;">
-        {'يوصى بالموافقة المشروطة فقط إذا بقي الهامش الفعلي أعلى من هامش التعادل مع إضافة هامش أمان، مع متابعة شهرية للغرامات والانحرافات.' if ar else 'Conditional approval is recommended only if real margin stays above break-even with safety buffer, with monthly monitoring of deviations and penalties.'}
-        </div>
-        {'<hr><div class="small-note"><b>ملاحظة:</b> في حال الرفض الكامل قد يتم توزيع الأعمال على مقاولين آخرين مما يؤثر على حصة العام القادم.</div>' if ar and show_notes else ''}
-        {'<hr><div class="small-note"><b>Note:</b> A full rejection may lead to future work redistribution to other contractors.</div>' if (not ar) and show_notes else ''}
-    </div>
-    """, unsafe_allow_html=True)
-
-st.caption("تم إعداد هذه اللوحة كنسخة تنفيذية أقرب للستايل الاستشاري الحديث." if ar else "Prepared as a modern consulting-style executive dashboard.")
+st.caption("نسخة تنفيذية متكاملة: Executive Overview + Discount Simulator + Risk Center + PDF Export.")
