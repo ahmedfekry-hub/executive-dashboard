@@ -132,7 +132,12 @@ def calc_row(revenue: float, current_margin: float, discount: float, current_pro
     # 3) Decision is NOT based on "profit > current profit" only.
     # 4) A minimum uplift threshold is required to justify the extra scale and risk.
     expected_margin = current_margin - discount
-    real_margin = expected_margin
+    # Advanced scenario: optionally include operational impact
+    if st.session_state.get("use_operational_impact", False):
+        real_margin = expected_margin - st.session_state.get("operational_impact_value", 0)
+    else:
+        real_margin = expected_margin
+
     net_profit = revenue * real_margin / 100.0
     delta_profit = net_profit - current_profit
 
@@ -250,6 +255,10 @@ current_margin = st.sidebar.number_input("Current Net Margin %", min_value=0.0, 
 discount_value = st.sidebar.number_input("Discount %", min_value=0.0, value=3.0, step=0.5, format="%.2f")
 # kept for UI continuity only; not used in final calculation
 operational_impact = st.sidebar.number_input("Operational Impact % (already absorbed)", min_value=0.0, value=0.0, step=0.5, format="%.2f")
+use_op = st.sidebar.checkbox("Enable Advanced Operational Impact Scenario", value=False)
+st.session_state["use_operational_impact"] = use_op
+st.session_state["operational_impact_value"] = operational_impact
+
 proposed_revenues = st.sidebar.multiselect("Proposed Revenues (M SAR)", [200, 230, 250], default=[200, 230, 250])
 
 st.sidebar.markdown("### Branding")
@@ -393,7 +402,7 @@ if page == "🏠 Executive Overview":
 # ------------------------- PAGE: SIMULATOR -------------------------
 elif page == "🎯 Discount Simulator":
     st.markdown('<div class="panel"><div class="label" style="font-size:1.02rem;">Discount Simulator</div>', unsafe_allow_html=True)
-    sim_revenue = st.selectbox("Revenue to Simulate", [200, 230, 250, 270, 300], index=2)
+    sim_revenue = st.selectbox("Revenue to Simulate", [200, 230, 250], index=2)
     sim_discounts = [x / 2 for x in range(5, 11)]  # 2.5 to 5.0
     sim_df = pd.DataFrame([calc_row(sim_revenue, current_margin, d, current_profit) for d in sim_discounts])
 
