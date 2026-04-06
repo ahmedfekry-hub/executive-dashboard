@@ -97,6 +97,27 @@ h1,h2,h3,h4,h5,h6,p,div,span,label{color: var(--text) !important;}
     border-radius: 12px !important;
 }
 .stDataFrame{border-radius:20px; overflow:hidden;}
+.rule-box{
+    background: linear-gradient(180deg, rgba(13,31,58,0.98), rgba(8,18,34,0.98));
+    border: 1px solid rgba(112,156,212,0.20);
+    border-left: 4px solid #4ba7ff;
+    border-radius: 18px;
+    padding: 16px 18px;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+    margin-top: 10px;
+}
+.rule-title{
+    color:#4ba7ff !important;
+    font-size:1.02rem;
+    font-weight:800;
+    margin-bottom:8px;
+}
+.rule-text{
+    color:#d8e5f7 !important;
+    font-size:0.92rem;
+    line-height:1.7;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -105,28 +126,41 @@ def money(v: float) -> str:
     return f"{v:,.2f}M"
 
 def calc_row(revenue: float, current_margin: float, discount: float, current_profit: float) -> dict:
-    # Final commercial logic per user instruction:
-    # fixed net margin baseline = 20% and it already includes operating costs/depreciation.
+    # Corrected board logic:
+    # 1) Net margin baseline is fixed at 20% and already fully loaded.
+    # 2) Discount reduces margin directly.
+    # 3) Decision is NOT based on "profit > current profit" only.
+    # 4) A minimum uplift threshold is required to justify the extra scale and risk.
     expected_margin = current_margin - discount
     real_margin = expected_margin
     net_profit = revenue * real_margin / 100.0
-    if net_profit > current_profit:
+    delta_profit = net_profit - current_profit
+
+    MIN_UPLIFT = 6.0  # minimum extra profit required vs current 30M baseline
+    if revenue < 230:
+        decision = "Reject"
+    elif discount >= 5.0 and revenue < 250:
+        decision = "Reject"
+    elif delta_profit < MIN_UPLIFT:
+        decision = "Reject"
+    elif discount >= 5.0 and revenue >= 250:
+        decision = "Review"
+    elif 2.5 <= discount <= 3.0 and revenue >= 230:
         decision = "Accept"
-    elif abs(net_profit - current_profit) < 0.001:
-        decision = "Break-even"
     else:
-        decision = "Risk"
+        decision = "Review"
+
     return {
         "Revenue": revenue,
         "Discount %": round(discount, 2),
         "Net Margin %": round(real_margin, 2),
         "Net Profit (M)": round(net_profit, 2),
-        "Delta Profit (M)": round(net_profit - current_profit, 2),
+        "Delta Profit (M)": round(delta_profit, 2),
         "Decision": decision,
     }
 
 def decision_color(decision: str) -> str:
-    return {"Accept":"#35d48a", "Risk":"#ffb44a", "Break-even":"#ff6363"}.get(decision, "#4ba7ff")
+    return {"Accept":"#35d48a", "Review":"#ffb44a", "Reject":"#ff6363"}.get(decision, "#4ba7ff")
 
 def build_pdf(summary: dict, scenario_df: pd.DataFrame) -> io.BytesIO:
     buffer = io.BytesIO()
@@ -208,7 +242,7 @@ def build_pdf(summary: dict, scenario_df: pd.DataFrame) -> io.BytesIO:
 # ------------------------- SIDEBAR -------------------------
 st.sidebar.image("brand_logo.png", use_container_width=True)
 st.sidebar.markdown("### Navigation")
-page = st.sidebar.radio("", ["🏠 Executive Overview", "🎯 Discount Simulator", "⚠️ Risk Center"], index=0)
+page = st.sidebar.radio("", ["🏠 Executive Overview", "🎯 Discount Simulator", "⚠️ Review Center"], index=0)
 
 st.sidebar.markdown("### Final Commercial Inputs")
 current_revenue = st.sidebar.number_input("Current Revenue (M SAR)", min_value=0.0, value=150.0, step=10.0, format="%.2f")
@@ -247,7 +281,7 @@ summary = {
     "current_margin": f"{current_margin:.2f}%",
     "current_profit": money(current_profit),
     "best_case": f'{int(best_row["Revenue"])}M @ {best_row["Discount %"]:.1f}% => {best_row["Net Profit (M)"]:.2f}M',
-    "recommendation": "Optimal discount range is 2.5%–3.0%. 5.0% is only justified at 250M with strong contractual safeguards."
+    "recommendation": "Optimal discount range is 2.5%–3.0% only from 230M upward. 5.0% is not approved automatically and should only be reviewed at 250M with strong safeguards."
 }
 pdf_buffer = build_pdf(summary, scenario_df)
 
@@ -327,11 +361,30 @@ if page == "🏠 Executive Overview":
     with c2:
         st.markdown('<div class="panel"><div class="label" style="font-size:1.02rem;">Decision Summary</div>', unsafe_allow_html=True)
         st.markdown(f"""
-        <div class="state accept"><b>✅ Accept</b><br><span class="small">2.5%–3.0% across 200M–250M delivers stronger profitability than the current baseline.</span></div><br>
-        <div class="state risk"><b>⚠️ Risk</b><br><span class="small">5.0% becomes a high-risk decision except when revenue is guaranteed at 250M.</span></div><br>
-        <div class="state reject"><b>❌ Not Preferred</b><br><span class="small">Any higher discount than 5.0% would weaken profitability quality under the same logic.</span></div>
+        <div class="state accept"><b>✅ Accept</b><br><span class="small">2.5%–3.0% is acceptable only when awarded revenue is at least 230M and profit uplift is meaningful.</span></div><br>
+        <div class="state risk"><b>⚠️ Review</b><br><span class="small">5.0% is rejected below 250M and only reviewed at 250M with strategic safeguards.</span></div><br>
+        <div class="state reject"><b>❌ Not Preferred</b><br><span class="small">Any scenario with low uplift versus the current baseline is rejected even if it remains mathematically profitable.</span></div>
         """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
+
+
+    st.markdown(
+        '''
+        <div class="rule-box">
+            <div class="rule-title">Decision Logic Applied</div>
+            <div class="rule-text">
+                • Fixed net margin baseline = <b>20%</b>; all operating costs and depreciation are already absorbed.<br>
+                • Discounts directly reduce the net margin.<br>
+                • A scenario is <b>not accepted</b> merely because profit is above the current baseline.<br>
+                • Minimum required profit uplift versus the current case = <b>6.0M</b>.<br>
+                • Any scenario below <b>230M</b> is rejected because the uplift is not considered strategically sufficient.<br>
+                • <b>2.5%–3.0%</b> is acceptable only when revenue is at least <b>230M</b> and uplift is meaningful.<br>
+                • <b>5.0%</b> is rejected below <b>250M</b> and only reviewed at <b>250M</b> with contractual safeguards.
+            </div>
+        </div>
+        ''',
+        unsafe_allow_html=True
+    )
 
     st.markdown('<div class="panel"><div class="label" style="font-size:1.02rem;">Final Scenario Table</div>', unsafe_allow_html=True)
     st.dataframe(scenario_df, use_container_width=True, hide_index=True)
@@ -351,7 +404,7 @@ elif page == "🎯 Discount Simulator":
         st.markdown(f"""<div class="kpi"><div class="label">Selected Discount</div><div class="value orange">{discount_value:.2f}%</div><div class="small">Controlled from sidebar</div></div>""", unsafe_allow_html=True)
     with s3:
         decision = selected_row["Decision"]
-        cls = "green" if decision == "Accept" else "orange" if decision == "Risk" else "red"
+        cls = "green" if decision == "Accept" else "orange" if decision == "Review" else "red"
         st.markdown(f"""<div class="kpi"><div class="label">Current Decision</div><div class="value {cls}">{decision}</div><div class="small">Based on selected revenue and discount</div></div>""", unsafe_allow_html=True)
 
     fig = go.Figure()
@@ -380,8 +433,8 @@ elif page == "🎯 Discount Simulator":
 # ------------------------- PAGE: RISK -------------------------
 else:
     risk_df = pd.DataFrame({
-        "Risk Area": ["Margin Erosion", "Deviation / Penalty Exposure", "Materials & Fuel Escalation", "Revenue Shortfall"],
-        "Risk Level": ["Medium", "Medium", "High", "High"],
+        "Review Area": ["Margin Erosion", "Deviation / Penalty Exposure", "Materials & Fuel Escalation", "Revenue Shortfall"],
+        "Review Level": ["Medium", "Medium", "High", "High"],
         "Board Comment": [
             "Controlled if discount stays within 2.5%–3.0%",
             "Manageable under secured annual planning",
@@ -389,14 +442,30 @@ else:
             "Critical if awarded revenue drops closer to 200M with higher discount"
         ]
     })
-    st.markdown('<div class="panel"><div class="label" style="font-size:1.02rem;">Risk Center</div>', unsafe_allow_html=True)
+    st.markdown('<div class="panel"><div class="label" style="font-size:1.02rem;">Review Center</div>', unsafe_allow_html=True)
     st.dataframe(risk_df, use_container_width=True, hide_index=True)
+
+    st.markdown(
+        '''
+        <div class="rule-box">
+            <div class="rule-title">Decision Logic Applied</div>
+            <div class="rule-text">
+                • Board logic is based on <b>risk-adjusted profit</b>, not mathematical profit only.<br>
+                • Small uplift does not justify discount plus extra scale and exposure.<br>
+                • Revenue below <b>230M</b> does not provide sufficient strategic upside under the agreed assumptions.<br>
+                • A <b>5.0%</b> discount requires upper-range revenue and protection clauses before any approval discussion.
+            </div>
+        </div>
+        ''',
+        unsafe_allow_html=True
+    )
+
     st.markdown("""
     <div class="panel">
         <div class="label" style="font-size:1.02rem;">Board Recommendation</div>
         <div class="small">
         The final preferred range is 2.5%–3.0% because it preserves stronger profitability across the 200M–250M range.
-        A 5.0% discount should only be approved when revenue is secured at 250M and accompanied by strong contractual safeguards.
+        A 5.0% discount should only be reviewed at 250M with contractual safeguards; otherwise it is rejected.
         </div>
     </div>
     """, unsafe_allow_html=True)
