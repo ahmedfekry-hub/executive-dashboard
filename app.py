@@ -269,11 +269,12 @@ def build_pdf(summary, df):
         max_profit = max(df["Net Profit"].max(), 1)
         bar_gap = 6*mm
         bar_w = (chart_w - (len(df)+1)*bar_gap) / max(len(df),1)
-        for i, row in enumerate(df.itertuples(index=False)):
+        for i, row in enumerate(df.to_dict(orient="records")):
             bx = chart_x + bar_gap + i*(bar_w + bar_gap)
-            bh = (row._4 / max_profit) * (chart_h - 8*mm)  # Net Profit position after columns order
+            profit_val = float(row.get("Net Profit", 0))
+            bh = (profit_val / max_profit) * (chart_h - 8*mm)
             by = chart_y + 4*mm
-            color = row._7
+            color = row.get("Decision Zone", "Reject")
             if color == "Accept":
                 c.setFillColorRGB(0.21, 0.83, 0.54)
             elif color == "Risk":
@@ -283,8 +284,8 @@ def build_pdf(summary, df):
             c.rect(bx, by, bar_w, bh, fill=1, stroke=0)
             c.setFillColor(colors.white)
             c.setFont("Helvetica", 8)
-            c.drawCentredString(bx + bar_w/2, chart_y - 4*mm, f"{int(row._0)}M")
-            c.drawCentredString(bx + bar_w/2, by + bh + 2*mm, f"{row._4:.1f}")
+            c.drawCentredString(bx + bar_w/2, chart_y - 4*mm, f"{int(row.get('Revenue', 0))}M")
+            c.drawCentredString(bx + bar_w/2, by + bh + 2*mm, f"{profit_val:.1f}")
 
     # Margin mini chart
     mx = 120*mm
@@ -301,9 +302,9 @@ def build_pdf(summary, df):
         min_m = min(df["Real Margin %"].min(), 0)
         rng = max(max_m - min_m, 1)
         points = []
-        for i, row in enumerate(df.itertuples(index=False)):
+        for i, row in enumerate(df.to_dict(orient="records")):
             px = mx + 7*mm + i*((mw-14*mm)/(len(df)-1))
-            py = my + 6*mm + ((row._2 - min_m)/rng)*(mh-12*mm)
+            py = my + 6*mm + ((float(row.get("Real Margin %", 0)) - min_m)/rng)*(mh-12*mm)
             points.append((px, py))
         c.setStrokeColorRGB(0.22, 0.87, 1.0)
         c.setLineWidth(2)
